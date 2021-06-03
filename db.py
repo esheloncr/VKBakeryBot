@@ -1,14 +1,25 @@
+import os
 from sqlalchemy import Column, ForeignKey, Integer, String, MetaData, create_engine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
-engine = create_engine("postgresql://postgres:b4hxd6u7@localhost:5432/flask_db")
+DB_URL = os.environ.get("DB_URL")
+DB_ASYNC_URL = os.environ.get("DB_URL_ASYNC")
+
+
+engine = create_engine(DB_URL)
 Base = declarative_base()
 metadata = MetaData()
 
 # Создание сессии для ORM
 Session = sessionmaker(bind=engine)
 session = Session()
+
+# Асинхронная сессия для ORM
+async_engine = create_async_engine(DB_ASYNC_URL)
+aSession = sessionmaker(bind=async_engine, class_=AsyncSession)
+asession = aSession()
 
 
 class Section(Base):

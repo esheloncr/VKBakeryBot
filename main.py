@@ -1,13 +1,15 @@
 import os
+import config
+from sqlalchemy.future import select
+from convert_photo import urls
 from vkbottle.bot import Bot, Message
+from vkbottle import PhotoMessageUploader
+from db import session, asession, Section, Product
 from keyboard import BeginButton, ShowSections, ShowProducts, ShowProduct
 from states import States
-from db import session, Section, Product
 
 TOKEN = os.environ.get("TOKEN")
-
 bot = Bot(TOKEN)
-
 START_WORDS = [
     "Привет",
     "Начать",
@@ -39,7 +41,15 @@ async def show_products(message: Message):
 # Название, описание продукта, фотография
 @bot.on.message(state=States.PRODUCTS, text=product_names)
 async def show_product(message: Message):
-    await message.answer("Продукт", keyboard=ShowProduct(eval(message.payload).get("section")).create_keyboard().get_json())
+    keyboard = ShowProduct(eval(message.payload).get("section")).create_keyboard().get_json()
+    async with asession as s:
+        queryset = await s.execute(select(Product).filter_by(title=message.text))
+        for q in queryset.scalars():
+            title = q.title
+            description = q.description
+        photo = await PhotoMessageUploader(bot.api).upload(urls.get(title))
+    await message.answer("{title}\n {description}".format(title=title, description=description), keyboard=keyboard,
+                         attachment=photo)
     await bot.state_dispenser.set(message.peer_id, States.PRODUCT)
 
 
@@ -58,10 +68,11 @@ async def back_to_sections(message: Message):
 
 
 # Возврат к последней выбранной категории
-@bot.on.message(state=States.PRODUCT)
+@bot.on.message(state=States.PRODUCT, text="Назад")
 async def back_from_product(message: Message):
     await message.answer("Выбранная категория: " + eval(message.payload).get("section"))
-    await message.answer("Доступные продукты: ", keyboard=ShowProducts(eval(message.payload).get("section")).create_keyboard().get_json())
+    await message.answer("Доступные продукты: ", keyboard=ShowProducts(eval(message.payload).get("section"))
+                         .create_keyboard().get_json())
     await bot.state_dispenser.set(message.peer_id, States.PRODUCTS)
 
 
